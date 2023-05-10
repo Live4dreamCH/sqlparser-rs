@@ -3657,122 +3657,167 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// consume tokens until the end of this column(comma and right parenthesis, themself not consumed)
+    fn escape_column(&mut self) -> Result<Option<TableConstraint>, ParserError> {
+        let mut left_sub_right_paren_num = 0;
+        loop {
+            let next_token = self.next_token();
+            match next_token.token {
+                Token::LParen => left_sub_right_paren_num += 1,
+                Token::RParen => {
+                    if 0 == left_sub_right_paren_num {
+                        self.prev_token();
+                        break;
+                    } else {
+                        left_sub_right_paren_num -= 1;
+                    }
+                }
+                Token::EOF => return self.expected("Comma or RParen", next_token),
+                Token::Comma => {
+                    if 0 == left_sub_right_paren_num {
+                        self.prev_token();
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                _ => continue,
+            }
+        }
+        if 0 != left_sub_right_paren_num {
+            parser_err!(format!("Expected RParen, now in this column, LParen is {left_sub_right_paren_num} more than RParen!"))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn parse_optional_table_constraint(
         &mut self,
     ) -> Result<Option<TableConstraint>, ParserError> {
-        let name = if self.parse_keyword(Keyword::CONSTRAINT) {
-            Some(self.parse_identifier()?)
-        } else {
-            None
-        };
+        // let name =
+        if self.parse_keyword(Keyword::CONSTRAINT) {
+            // Some(self.parse_identifier()?)
+            return self.escape_column();
+        }
+        // else {
+        //     None
+        // };
+
+        let name: Option<Ident> = None;
 
         let next_token = self.next_token();
         match next_token.token {
             Token::Word(w) if w.keyword == Keyword::PRIMARY || w.keyword == Keyword::UNIQUE => {
-                let is_primary = w.keyword == Keyword::PRIMARY;
-                if is_primary {
-                    self.expect_keyword(Keyword::KEY)?;
-                }
-                let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
-                Ok(Some(TableConstraint::Unique {
-                    name,
-                    columns,
-                    is_primary,
-                }))
+                return self.escape_column();
+                // let is_primary = w.keyword == Keyword::PRIMARY;
+                // if is_primary {
+                //     self.expect_keyword(Keyword::KEY)?;
+                // }
+                // let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
+                // Ok(Some(TableConstraint::Unique {
+                //     name,
+                //     columns,
+                //     is_primary,
+                // }))
             }
             Token::Word(w) if w.keyword == Keyword::FOREIGN => {
-                self.expect_keyword(Keyword::KEY)?;
-                let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
-                self.expect_keyword(Keyword::REFERENCES)?;
-                let foreign_table = self.parse_object_name()?;
-                let referred_columns = self.parse_parenthesized_column_list(Mandatory, false)?;
-                let mut on_delete = None;
-                let mut on_update = None;
-                loop {
-                    if on_delete.is_none() && self.parse_keywords(&[Keyword::ON, Keyword::DELETE]) {
-                        on_delete = Some(self.parse_referential_action()?);
-                    } else if on_update.is_none()
-                        && self.parse_keywords(&[Keyword::ON, Keyword::UPDATE])
-                    {
-                        on_update = Some(self.parse_referential_action()?);
-                    } else {
-                        break;
-                    }
-                }
-                Ok(Some(TableConstraint::ForeignKey {
-                    name,
-                    columns,
-                    foreign_table,
-                    referred_columns,
-                    on_delete,
-                    on_update,
-                }))
+                // todo: foreign might be treated as reference of other message
+                return self.escape_column();
+                // self.expect_keyword(Keyword::KEY)?;
+                // let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
+                // self.expect_keyword(Keyword::REFERENCES)?;
+                // let foreign_table = self.parse_object_name()?;
+                // let referred_columns = self.parse_parenthesized_column_list(Mandatory, false)?;
+                // let mut on_delete = None;
+                // let mut on_update = None;
+                // loop {
+                //     if on_delete.is_none() && self.parse_keywords(&[Keyword::ON, Keyword::DELETE]) {
+                //         on_delete = Some(self.parse_referential_action()?);
+                //     } else if on_update.is_none()
+                //         && self.parse_keywords(&[Keyword::ON, Keyword::UPDATE])
+                //     {
+                //         on_update = Some(self.parse_referential_action()?);
+                //     } else {
+                //         break;
+                //     }
+                // }
+                // Ok(Some(TableConstraint::ForeignKey {
+                //     name,
+                //     columns,
+                //     foreign_table,
+                //     referred_columns,
+                //     on_delete,
+                //     on_update,
+                // }))
             }
             Token::Word(w) if w.keyword == Keyword::CHECK => {
-                self.expect_token(&Token::LParen)?;
-                let expr = Box::new(self.parse_expr()?);
-                self.expect_token(&Token::RParen)?;
-                Ok(Some(TableConstraint::Check { name, expr }))
+                return self.escape_column();
+                // self.expect_token(&Token::LParen)?;
+                // let expr = Box::new(self.parse_expr()?);
+                // self.expect_token(&Token::RParen)?;
+                // Ok(Some(TableConstraint::Check { name, expr }))
             }
             Token::Word(w)
                 if (w.keyword == Keyword::INDEX || w.keyword == Keyword::KEY)
                     && dialect_of!(self is GenericDialect | MySqlDialect) =>
             {
-                let display_as_key = w.keyword == Keyword::KEY;
+                return self.escape_column();
+                // let display_as_key = w.keyword == Keyword::KEY;
 
-                let name = match self.peek_token().token {
-                    Token::Word(word) if word.keyword == Keyword::USING => None,
-                    _ => self.maybe_parse(|parser| parser.parse_identifier()),
-                };
+                // let name = match self.peek_token().token {
+                //     Token::Word(word) if word.keyword == Keyword::USING => None,
+                //     _ => self.maybe_parse(|parser| parser.parse_identifier()),
+                // };
 
-                let index_type = if self.parse_keyword(Keyword::USING) {
-                    Some(self.parse_index_type()?)
-                } else {
-                    None
-                };
-                let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
+                // let index_type = if self.parse_keyword(Keyword::USING) {
+                //     Some(self.parse_index_type()?)
+                // } else {
+                //     None
+                // };
+                // let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
 
-                Ok(Some(TableConstraint::Index {
-                    display_as_key,
-                    name,
-                    index_type,
-                    columns,
-                }))
+                // Ok(Some(TableConstraint::Index {
+                //     display_as_key,
+                //     name,
+                //     index_type,
+                //     columns,
+                // }))
             }
             Token::Word(w)
                 if (w.keyword == Keyword::FULLTEXT || w.keyword == Keyword::SPATIAL)
                     && dialect_of!(self is GenericDialect | MySqlDialect) =>
             {
-                if let Some(name) = name {
-                    return self.expected(
-                        "FULLTEXT or SPATIAL option without constraint name",
-                        TokenWithLocation {
-                            token: Token::make_keyword(&name.to_string()),
-                            location: next_token.location,
-                        },
-                    );
-                }
+                return self.escape_column();
+                // if let Some(name) = name {
+                //     return self.expected(
+                //         "FULLTEXT or SPATIAL option without constraint name",
+                //         TokenWithLocation {
+                //             token: Token::make_keyword(&name.to_string()),
+                //             location: next_token.location,
+                //         },
+                //     );
+                // }
 
-                let fulltext = w.keyword == Keyword::FULLTEXT;
+                // let fulltext = w.keyword == Keyword::FULLTEXT;
 
-                let index_type_display = if self.parse_keyword(Keyword::KEY) {
-                    KeyOrIndexDisplay::Key
-                } else if self.parse_keyword(Keyword::INDEX) {
-                    KeyOrIndexDisplay::Index
-                } else {
-                    KeyOrIndexDisplay::None
-                };
+                // let index_type_display = if self.parse_keyword(Keyword::KEY) {
+                //     KeyOrIndexDisplay::Key
+                // } else if self.parse_keyword(Keyword::INDEX) {
+                //     KeyOrIndexDisplay::Index
+                // } else {
+                //     KeyOrIndexDisplay::None
+                // };
 
-                let opt_index_name = self.maybe_parse(|parser| parser.parse_identifier());
+                // let opt_index_name = self.maybe_parse(|parser| parser.parse_identifier());
 
-                let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
+                // let columns = self.parse_parenthesized_column_list(Mandatory, false)?;
 
-                Ok(Some(TableConstraint::FulltextOrSpatial {
-                    fulltext,
-                    index_type_display,
-                    opt_index_name,
-                    columns,
-                }))
+                // Ok(Some(TableConstraint::FulltextOrSpatial {
+                //     fulltext,
+                //     index_type_display,
+                //     opt_index_name,
+                //     columns,
+                // }))
             }
             _ => {
                 if name.is_some() {
