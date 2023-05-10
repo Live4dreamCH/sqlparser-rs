@@ -341,6 +341,8 @@ pub enum TableConstraint {
         /// Referred column identifier list.
         columns: Vec<Ident>,
     },
+    /// escape these constrains
+    Escape,
 }
 
 impl fmt::Display for TableConstraint {
