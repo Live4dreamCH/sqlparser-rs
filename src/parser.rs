@@ -3687,7 +3687,7 @@ impl<'a> Parser<'a> {
         if 0 != left_sub_right_paren_num {
             parser_err!(format!("Expected RParen, now in this column, LParen is {left_sub_right_paren_num} more than RParen!"))
         } else {
-            Ok(None)
+            Ok(Some(TableConstraint::Escape))
         }
     }
 

@@ -427,6 +427,7 @@ impl fmt::Display for TableConstraint {
 
                 Ok(())
             }
+            TableConstraint::Escape => write!(f, "Escape parsing TableConstraint"),
         }
     }
 }
